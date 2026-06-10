@@ -1,0 +1,22 @@
+# 依赖
+node_modules/
+
+# 数据和密钥
+.env
+data.json
+app.log
+*.log
+
+# 开发构建
+build/
+dist/
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# 临时文件
+*.tmp
+*.temp

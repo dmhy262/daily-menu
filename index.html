@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>家庭菜谱生成器</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%); min-height: 100vh; }
+    .header { background: linear-gradient(90deg, #f97316 0%, #f59e0b 100%); color: white; padding: 20px; text-align: center; }
+    .header h1 { font-size: 28px; margin-bottom: 5px; }
+    .header p { opacity: 0.9; font-size: 14px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .tab { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; background: white; color: #333; transition: all 0.3s; }
+    .tab.active { background: linear-gradient(90deg, #f97316 0%, #f59e0b 100%); color: white; }
+    .tab:hover { background: #fef3c7; }
+    .tab.active:hover { background: linear-gradient(90deg, #f97316 0%, #f59e0b 100%); }
+    .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; transition: all 0.3s; }
+    .btn-orange { background: linear-gradient(90deg, #f97316 0%, #f59e0b 100%); color: white; }
+    .btn-orange:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4); }
+    .btn-green { background: #22c55e; color: white; }
+    .btn-green:hover { background: #16a34a; }
+    .btn-red { background: #ef4444; color: white; }
+    .btn-red:hover { background: #dc2626; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 16px; margin-bottom: 16px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; }
+    .card-header:hover { background: #f9fafb; }
+    .day-badge { width: 40px; height: 40px; background: linear-gradient(135deg, #f97316 0%, #f59e0b 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px; }
+    .day-info { flex: 1; margin-left: 15px; }
+    .day-title { font-weight: bold; color: #1f2937; }
+    .day-menu { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    .meal-row { display: flex; align-items: center; gap: 12px; padding: 10px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px; }
+    .meal-row:last-child { margin-bottom: 0; }
+    .meal-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .meal-morning { background: #fef3c7; color: #d97706; }
+    .meal-lunch { background: #fed7aa; color: #ea580c; }
+    .meal-dinner { background: #e0e7ff; color: #6366f1; }
+    .meal-info { flex: 1; }
+    .meal-name { font-weight: 500; color: #1f2937; cursor: pointer; }
+    .meal-name:hover { color: #f97316; }
+    .meal-time { font-size: 12px; color: #9ca3af; }
+    .shopping-item { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px; }
+    .shopping-item.purchased { background: #ecfdf5; }
+    .shopping-item.purchased .item-name { text-decoration: line-through; color: #9ca3af; }
+    .check-box { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #d1d5db; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .check-box.checked { background: #22c55e; border-color: #22c55e; color: white; }
+    .item-name { flex: 1; font-weight: 500; color: #1f2937; }
+    .item-qty { display: flex; align-items: center; gap: 8px; }
+    .qty-btn { width: 24px; height: 24px; border-radius: 50%; background: #e5e7eb; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .qty-btn:hover { background: #d1d5db; }
+    .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .recipe-card { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); padding: 16px; }
+    .recipe-card.blacklisted { opacity: 0.6; }
+    .recipe-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+    .recipe-name { font-weight: bold; color: #1f2937; font-size: 16px; }
+    .recipe-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .tag { padding: 3px 8px; border-radius: 10px; font-size: 11px; }
+    .tag-morning { background: #fef3c7; color: #d97706; }
+    .tag-lunch { background: #fed7aa; color: #ea580c; }
+    .tag-dinner { background: #e0e7ff; color: #6366f1; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+    .modal { background: white; border-radius: 16px; max-width: 600px; width: 100%; max-height: 90vh; overflow-y: auto; }
+    .modal-header { background: linear-gradient(135deg, #f97316 0%, #f59e0b 100%); color: white; padding: 30px; text-align: center; position: relative; }
+    .modal-title { font-size: 24px; margin-bottom: 5px; }
+    .modal-close { position: absolute; top: 15px; right: 15px; width: 35px; height: 35px; background: rgba(0,0,0,0.2); border-radius: 50%; border: none; color: white; font-size: 20px; cursor: pointer; }
+    .modal-close:hover { background: rgba(0,0,0,0.3); }
+    .modal-body { padding: 20px; }
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: #f9fafb; border-radius: 10px; padding: 15px; text-align: center; }
+    .stat-value { font-weight: bold; color: #1f2937; margin-top: 5px; }
+    .stat-label { font-size: 12px; color: #6b7280; }
+    .section-title { font-weight: bold; color: #1f2937; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+    .ingredient-list { list-style: none; }
+    .ingredient-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .ingredient-num { width: 24px; height: 24px; background: #fed7aa; color: #ea580c; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; }
+    .step-list { list-style: none; }
+    .step-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+    .step-num { width: 32px; height: 32px; background: linear-gradient(135deg, #f97316 0%, #f59e0b 100%); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0; }
+    .step-text { line-height: 1.6; color: #4b5563; }
+    .form-group { margin-bottom: 15px; }
+    .form-label { display: block; font-size: 14px; color: #374151; margin-bottom: 5px; }
+    .form-input { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
+    .form-select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; }
+    .form-row { display: flex; gap: 10px; }
+    .form-row .form-group { flex: 1; }
+    .ing-input { display: flex; gap: 8px; margin-bottom: 8px; }
+    .ing-input input { flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; }
+    .add-btn { color: #22c55e; font-size: 13px; cursor: pointer; }
+    .add-btn:hover { color: #16a34a; }
+    .search-box { width: 100%; padding: 10px 15px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; margin-bottom: 15px; }
+    .text-center { text-align: center; padding: 40px; color: #9ca3af; }
+    .text-center .icon { font-size: 48px; margin-bottom: 10px; }
+    .bg-none { background: transparent; }
+    @media (max-width: 640px) {
+      .container { padding: 10px; }
+      .tabs { justify-content: stretch; }
+      .tab { flex: 1; }
+      .day-menu { display: none; }
+      .stat-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🍳 家庭菜谱生成器</h1>
+    <p>智能生成每周菜谱，让做饭变得简单</p>
+  </div>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('weekmenu')">📅 周菜谱</button>
+      <button class="tab" onclick="showTab('shopping')">🛒 购物清单</button>
+      <button class="tab" onclick="showTab('recipes')">📖 菜谱管理</button>
+    </div>
+
+    <div id="weekmenu" class="tab-content">
+      <button class="btn btn-orange mb-4" onclick="regenerateMenu()">🔄 重新生成菜谱</button>
+      <div id="weekMenuContainer"></div>
+    </div>
+
+    <div id="shopping" class="tab-content" style="display: none;">
+      <div class="card">
+        <div style="background: linear-gradient(90deg, #f97316 0%, #f59e0b 100%); padding: 15px; border-radius: 12px 12px 0 0; color: white; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">🛒</span>
+            <h2 style="font-weight: bold;">购物清单</h2>
+          </div>
+          <span id="shoppingProgress" style="background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px; font-size: 13px;">0/0 已购</span>
+        </div>
+        <div style="padding: 15px;">
+          <div id="shoppingList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="recipes" class="tab-content" style="display: none;">
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+        <button class="btn btn-green" onclick="showAddRecipeModal()">➕ 添加菜谱</button>
+        <button class="btn btn-orange" onclick="showImportModal()">📥 批量导入</button>
+        <button class="btn btn-red" onclick="deleteSelectedRecipes()" id="deleteSelectedBtn" disabled style="opacity: 0.6; cursor: not-allowed;">🗑️ 批量删除 (0)</button>
+        <label class="btn" style="background: #f3f4f6; color: #374151; cursor: pointer;">
+          <input type="checkbox" id="selectAllRecipes" onchange="toggleSelectAll()" style="display: none;">
+          ☑️ 全选
+        </label>
+      </div>
+      <input type="text" class="search-box" placeholder="搜索菜谱名称..." id="recipeSearch" onkeyup="filterRecipes()">
+      <div id="recipeGrid" class="recipe-grid"></div>
+    </div>
+  </div>
+
+  <div id="recipeModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <button class="modal-close" onclick="closeModal()">×</button>
+        <span style="font-size: 48px; display: block; margin-bottom: 10px;">🍳</span>
+        <h2 class="modal-title" id="modalRecipeName"></h2>
+        <span id="modalRecipeType" style="display: inline-block; margin-top: 8px; padding: 4px 12px; background: rgba(255,255,255,0.2); border-radius: 20px; font-size: 13px;"></span>
+      </div>
+      <div class="modal-body">
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+          <button id="modalBlacklistBtn" class="btn btn-sm" onclick="blacklistFromModal()">⚠️ 拉黑</button>
+        </div>
+        <div class="stat-row">
+          <div class="stat-card">
+            <span>⏰</span>
+            <div class="stat-value" id="statTime"></div>
+            <div class="stat-label">烹饪时间</div>
+          </div>
+          <div class="stat-card">
+            <span>👩🍳</span>
+            <div class="stat-value" id="statDifficulty"></div>
+            <div class="stat-label">难度</div>
+          </div>
+          <div class="stat-card">
+            <span>🔥</span>
+            <div class="stat-value" id="statCalories"></div>
+            <div class="stat-label">热量 (kcal)</div>
+          </div>
+        </div>
+        <h3 class="section-title">📝 食材清单</h3>
+        <ul class="ingredient-list" id="ingredientList"></ul>
+        <h3 class="section-title">👩🍳 烹饪步骤</h3>
+        <ol class="step-list" id="stepList"></ol>
+      </div>
+    </div>
+  </div>
+
+  <div id="addRecipeModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header" style="background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);">
+        <button class="modal-close" onclick="closeAddRecipeModal()">×</button>
+        <h2 class="modal-title">添加新菜谱</h2>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">菜谱名称 *</label>
+          <input type="text" class="form-input" id="newRecipeName" placeholder="如：番茄炒蛋">
+        </div>
+        <div class="form-group">
+          <label class="form-label">适用时段</label>
+          <select class="form-select" id="newRecipeType">
+            <option value="breakfast">🌅 早餐</option>
+            <option value="lunch">🔥 午餐</option>
+            <option value="dinner">🌙 晚餐</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">食材清单</label>
+          <div id="newIngredients">
+            <div class="ing-input">
+              <input type="text" placeholder="食材 1" id="ing0">
+              <button class="qty-btn" onclick="removeIngredient(0)" style="background: #fee2e2; color: #dc2626;">×</button>
+            </div>
+          </div>
+          <div class="add-btn" onclick="addIngredient()">+ 添加食材</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">烹饪步骤</label>
+          <div id="newSteps">
+            <div class="ing-input">
+              <textarea placeholder="步骤 1" rows="2" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; resize: none;" id="step0"></textarea>
+              <button class="qty-btn" onclick="removeStep(0)" style="background: #fee2e2; color: #dc2626; align-self: flex-start; margin-top: 0;">×</button>
+            </div>
+          </div>
+          <div class="add-btn" onclick="addStep()">+ 添加步骤</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">烹饪时间</label>
+            <input type="text" class="form-input" id="newRecipeTime" placeholder="如：30分钟">
+          </div>
+          <div class="form-group">
+            <label class="form-label">难度</label>
+            <select class="form-select" id="newRecipeDifficulty">
+              <option value="简单">简单</option>
+              <option value="中等">中等</option>
+              <option value="困难">困难</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">热量 (kcal)</label>
+          <input type="number" class="form-input" id="newRecipeCalories" placeholder="如：350">
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn" style="flex: 1; background: #e5e7eb; color: #374151;" onclick="closeAddRecipeModal()">取消</button>
+          <button class="btn btn-green" style="flex: 1;" onclick="saveNewRecipe()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="importModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header" style="background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);">
+        <button class="modal-close" onclick="closeImportModal()">×</button>
+        <h2 class="modal-title">批量导入菜谱</h2>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">导入数据 (JSON格式)</label>
+          <textarea id="importContent" class="form-input" rows="10" placeholder='{"name":"菜名","type":"lunch","ingredients":["食材1","食材2"],"steps":["步骤1","步骤2"],"time":"30分钟","difficulty":"简单","calories":350}'></textarea>
+        </div>
+        <div class="form-group" style="background: #fef3c7; padding: 15px; border-radius: 8px;">
+          <label class="form-label" style="color: #92400e;">📝 格式说明</label>
+          <p style="font-size: 13px; color: #92400e; margin: 5px 0;">
+            单个菜谱格式：
+          </p>
+          <pre style="font-size: 12px; color: #92400e; background: rgba(0,0,0,0.1); padding: 10px; border-radius: 4px; overflow-x: auto;">
+{"name":"菜名","type":"lunch","ingredients":["食材1","食材2"],"steps":["步骤1","步骤2"],"time":"30分钟","difficulty":"简单","calories":350}
+          </pre>
+          <p style="font-size: 13px; color: #92400e; margin: 5px 0;">
+            批量导入（多个菜谱用英文逗号分隔）：
+          </p>
+          <pre style="font-size: 12px; color: #92400e; background: rgba(0,0,0,0.1); padding: 10px; border-radius: 4px; overflow-x: auto;">
+[{"name":"菜名1","type":"lunch",...},{"name":"菜名2","type":"dinner",...}]
+          </pre>
+          <p style="font-size: 12px; color: #b45309; margin-top: 10px;">
+            <strong>type可选值：</strong>breakfast（早餐）、lunch（午餐）、dinner（晚餐）
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button class="btn" style="flex: 1; background: #e5e7eb; color: #374151;" onclick="closeImportModal()">取消</button>
+          <button class="btn btn-orange" style="flex: 1;" onclick="importRecipes()">开始导入</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const initialRecipes = [
+      { id: 1, name: '番茄炒蛋', type: 'lunch', ingredients: ['番茄 2个', '鸡蛋 3个', '盐 1勺', '糖 半勺'], steps: ['番茄切块，鸡蛋打散', '热锅倒油，倒入蛋液炒至凝固盛出', '锅中留油，放入番茄炒出汁', '加入鸡蛋翻炒，加盐和糖调味'], time: '20分钟', calories: 350, difficulty: '简单' },
+      { id: 2, name: '红烧肉', type: 'lunch', ingredients: ['五花肉 500g', '姜片 3片', '葱段 适量', '料酒 2勺', '生抽 2勺', '老抽 1勺', '冰糖 适量'], steps: ['五花肉切块焯水', '锅中放少量油，炒冰糖至融化', '倒入五花肉翻炒上色', '加料酒、生抽、老抽调味', '加水没过肉，小火炖1小时'], time: '90分钟', calories: 680, difficulty: '中等' },
+      { id: 3, name: '清蒸鲈鱼', type: 'dinner', ingredients: ['鲈鱼 1条', '姜片 5片', '葱段 适量', '蒸鱼豉油 2勺', '料酒 1勺'], steps: ['鲈鱼处理干净，鱼身划几刀', '鱼身和肚子里放姜片、葱段，淋料酒', '蒸锅中水烧开后蒸10-15分钟', '倒掉蒸出的水，淋蒸鱼豉油', '热油浇在葱丝上'], time: '25分钟', calories: 420, difficulty: '简单' },
+      { id: 4, name: '宫保鸡丁', type: 'lunch', ingredients: ['鸡胸肉 300g', '花生米 100g', '干辣椒 适量', '黄瓜 1根', '葱姜蒜 适量', '料酒 1勺', '生抽 1勺', '醋 1勺', '糖 1勺'], steps: ['鸡胸肉切丁，用料酒、盐腌制10分钟', '花生米油炸或烤熟', '调碗汁：生抽、醋、糖、盐、淀粉', '炒香干辣椒和花椒，加入鸡丁炒至变色', '加入黄瓜丁翻炒，倒入碗汁和花生米'], time: '30分钟', calories: 520, difficulty: '中等' },
+      { id: 5, name: '清炒时蔬', type: 'dinner', ingredients: ['青菜 300g', '蒜 3瓣', '盐 1勺', '蚝油 1勺'], steps: ['青菜洗净切段', '蒜切蒜末', '热锅热油爆香蒜末', '倒入青菜快速翻炒', '加少许水焖1分钟', '加盐和蚝油调味'], time: '15分钟', calories: 180, difficulty: '简单' },
+      { id: 6, name: '鸡蛋羹', type: 'breakfast', ingredients: ['鸡蛋 2个', '温水 200ml', '盐 少许', '香油 几滴'], steps: ['鸡蛋打散，加入温水和盐搅匀', '过筛后倒入碗中，撇去浮沫', '水烧开后上锅蒸8分钟', '出锅滴几滴香油'], time: '15分钟', calories: 180, difficulty: '简单' },
+      { id: 7, name: '葱油拌面', type: 'breakfast', ingredients: ['面条 150g', '小葱 2根', '生抽 2勺', '老抽 半勺', '糖 半勺', '食用油 3勺'], steps: ['面条煮熟捞出，过凉水', '调酱汁：生抽、老抽、糖、少量水', '面条放入碗中，淋上酱汁', '小葱切葱花撒在面条上', '热油浇在葱花上'], time: '15分钟', calories: 420, difficulty: '简单' },
+      { id: 8, name: '番茄牛腩汤', type: 'dinner', ingredients: ['牛腩 500g', '番茄 2个', '土豆 1个', '胡萝卜 1根', '姜片 3片', '料酒 2勺', '盐 适量'], steps: ['牛腩切块焯水', '番茄、土豆、胡萝卜切块', '牛腩冷水下锅，加姜片、料酒', '大火烧开转小火炖1小时', '加入番茄、土豆、胡萝卜继续炖30分钟', '加盐调味'], time: '120分钟', calories: 580, difficulty: '中等' },
+      { id: 9, name: '蒜蓉西兰花', type: 'dinner', ingredients: ['西兰花 300g', '蒜 5瓣', '盐 1勺', '蚝油 1勺'], steps: ['西兰花焯水备用', '蒜切末', '锅中倒油爆香蒜末', '倒入西兰花翻炒', '加盐和蚝油调味'], time: '15分钟', calories: 150, difficulty: '简单' },
+      { id: 10, name: '火腿蛋三明治', type: 'breakfast', ingredients: ['面包 2片', '火腿 2片', '鸡蛋 1个', '生菜 1片', '沙拉酱 适量'], steps: ['鸡蛋煎熟', '火腿煎香', '面包烤至微黄', '面包依次放生菜、火腿、鸡蛋、沙拉酱', '盖上另一片面包，对角切开'], time: '15分钟', calories: 480, difficulty: '简单' },
+      { id: 11, name: '鱼香肉丝', type: 'lunch', ingredients: ['猪肉丝 200g', '木耳 适量', '胡萝卜 半根', '青椒 1个', '葱姜蒜 适量', '豆瓣酱 1勺', '糖 1勺', '醋 1勺', '生抽 1勺'], steps: ['肉丝用料酒、淀粉腌制10分钟', '调鱼香汁：糖、醋、生抽、淀粉、水', '胡萝卜、青椒、木耳切丝', '爆香豆瓣酱，加入葱姜蒜', '加入肉丝翻炒，再加配菜', '倒入鱼香汁翻炒均匀'], time: '30分钟', calories: 450, difficulty: '中等' },
+      { id: 12, name: '玉米排骨汤', type: 'dinner', ingredients: ['排骨 500g', '玉米 2根', '胡萝卜 1根', '姜片 2片', '盐 适量'], steps: ['排骨焯水', '玉米切段，胡萝卜切块', '排骨、玉米、胡萝卜、姜片放入锅中', '加水没过食材，大火烧开转小火炖1小时', '加盐调味'], time: '90分钟', calories: 420, difficulty: '简单' },
+      { id: 13, name: '三明治', type: 'breakfast', ingredients: ['面包 2片', '鸡蛋 1个', '生菜 1片', '火腿 2片', '沙拉酱 适量'], steps: ['鸡蛋煎熟', '火腿切片煎香', '面包依次放生菜、火腿、鸡蛋、沙拉酱', '盖上另一片面包'], time: '10分钟', calories: 350, difficulty: '简单' },
+      { id: 14, name: '香菇青菜', type: 'lunch', ingredients: ['青菜 300g', '香菇 5朵', '蒜 2瓣', '盐 1勺', '蚝油 1勺'], steps: ['香菇切片，青菜洗净', '蒜切末', '锅中倒油爆香蒜末', '加入香菇翻炒', '加入青菜翻炒，加盐和蚝油'], time: '15分钟', calories: 180, difficulty: '简单' },
+      { id: 15, name: '水煮肉片', type: 'lunch', ingredients: ['猪里脊肉 300g', '豆芽 200g', '干辣椒 适量', '花椒 适量', '葱姜蒜 适量', '豆瓣酱 1勺', '盐 适量'], steps: ['肉片用料酒、盐、淀粉腌制10分钟', '豆芽焯水铺碗底', '爆香豆瓣酱，加葱姜蒜', '加水烧开，放入肉片煮至变色', '倒入碗中，撒干辣椒、花椒', '热油淋上'], time: '35分钟', calories: 520, difficulty: '中等' },
+      { id: 16, name: '皮蛋瘦肉粥', type: 'breakfast', ingredients: ['大米 100g', '瘦肉 100g', '皮蛋 1个', '盐 适量', '葱花 适量'], steps: ['大米淘洗干净，提前浸泡30分钟', '瘦肉切丝，用盐、料酒腌制', '皮蛋切丁', '大米加水煮至浓稠', '加入肉丝和皮蛋煮10分钟', '加盐调味，撒葱花'], time: '60分钟', calories: 320, difficulty: '简单' },
+      { id: 17, name: '蒜蓉虾', type: 'dinner', ingredients: ['大虾 500g', '蒜 10瓣', '粉丝 1把', '生抽 2勺', '蚝油 1勺'], steps: ['虾剪去须脚开背去虾线', '粉丝泡软铺盘底', '虾平铺在粉丝上', '蒜末、生抽、蚝油调成酱汁', '酱汁均匀浇在虾上', '蒸锅上汽后蒸8分钟'], time: '25分钟', calories: 400, difficulty: '简单' },
+      { id: 18, name: '糖醋排骨', type: 'lunch', ingredients: ['排骨 500g', '姜片 3片', '料酒 2勺', '生抽 2勺', '老抽 1勺', '醋 3勺', '糖 3勺'], steps: ['排骨焯水', '排骨冷水下锅，加姜片、料酒', '大火烧开转小火煮30分钟', '调糖醋汁：生抽、老抽、醋、糖', '倒入锅中大火收汁'], time: '60分钟', calories: 620, difficulty: '中等' }
+    ];
+
+    let recipes = JSON.parse(localStorage.getItem('recipes') || JSON.stringify(initialRecipes));
+    let blacklistedIds = JSON.parse(localStorage.getItem('blacklistedIds') || '[]');
+    let weekMenu = JSON.parse(localStorage.getItem('weekMenu') || '[]');
+    let currentRecipe = null;
+    let currentSearch = '';
+    let ingredientCount = 1;
+    let stepCount = 1;
+    let selectedRecipes = new Set();
+    let editingRecipe = null;
+
+    const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const weekNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const expandedDays = new Set();
+
+    function generateWeekMenu() {
+      const filtered = recipes.filter(r => !blacklistedIds.includes(r.id));
+      const breakfast = filtered.filter(r => r.type === 'breakfast' || r.type === 'lunch');
+      const lunch = filtered.filter(r => r.type === 'breakfast' || r.type === 'lunch');
+      const dinner = filtered.filter(r => r.type === 'dinner');
+      
+      if (breakfast.length === 0 || lunch.length === 0 || dinner.length === 0) {
+        alert('菜谱数量不足，请先添加更多菜谱或恢复已拉黑的菜谱！');
+        return [];
+      }
+
+      const random = arr => arr[Math.floor(Math.random() * arr.length)];
+      return weekDays.map((day, i) => ({
+        id: day,
+        name: weekNames[i],
+        breakfast: random(breakfast),
+        lunch: random(lunch),
+        dinner: random(dinner)
+      }));
+    }
+
+    function getTypeName(type) {
+      switch(type) {
+        case 'breakfast': return '早餐';
+        case 'lunch': return '午餐';
+        case 'dinner': return '晚餐';
+        default: return '其他';
+      }
+    }
+
+    function getTypeTag(type) {
+      switch(type) {
+        case 'breakfast': return { class: 'tag-morning', text: '🌅 早餐' };
+        case 'lunch': return { class: 'tag-lunch', text: '🔥 午餐' };
+        case 'dinner': return { class: 'tag-dinner', text: '🌙 晚餐' };
+        default: return { class: 'tag-lunch', text: '🍴 其他' };
+      }
+    }
+
+    function getMealIcon(type) {
+      switch(type) {
+        case 'breakfast': return '🌅';
+        case 'lunch': return '🔥';
+        case 'dinner': return '🌙';
+        default: return '🍴';
+      }
+    }
+
+    function renderWeekMenu() {
+      const container = document.getElementById('weekMenuContainer');
+      if (weekMenu.length === 0) {
+        weekMenu = generateWeekMenu();
+        localStorage.setItem('weekMenu', JSON.stringify(weekMenu));
+      }
+
+      container.innerHTML = weekMenu.map(day => {
+        const isExpanded = expandedDays.has(day.id);
+        return `
+          <div class="card">
+            <div class="card-header" onclick="toggleDay('${day.id}')">
+              <div style="display: flex; align-items: center;">
+                <div class="day-badge">${day.name.slice(-1)}</div>
+                <div class="day-info">
+                  <div class="day-title">${day.name}</div>
+                  <div class="day-menu">${day.breakfast.name} / ${day.lunch.name} / ${day.dinner.name}</div>
+                </div>
+              </div>
+              <span style="color: #9ca3af; font-size: 16px; transition: transform 0.3s;">${isExpanded ? '▼' : '▶'}</span>
+            </div>
+            <div id="day-${day.id}" style="display: ${isExpanded ? 'block' : 'none'}; padding-top: 10px;">
+              ${['breakfast', 'lunch', 'dinner'].map(meal => {
+                const m = day[meal];
+                const icon = getMealIcon(meal);
+                return `
+                  <div class="meal-row">
+                    <div class="meal-icon meal-${meal === 'breakfast' ? 'morning' : meal === 'lunch' ? 'lunch' : 'dinner'}">${icon}</div>
+                    <div class="meal-info">
+                      <div class="meal-name" onclick="showRecipeDetail(${m.id}, event)">${m.name}</div>
+                      <div class="meal-time">${m.time} · ${m.difficulty}</div>
+                    </div>
+                    <button class="btn btn-sm" style="background: #fef3c7; color: #d97706;" onclick="changeMeal('${day.id}', '${meal}', event)">更换</button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleDay(dayId) {
+      if (expandedDays.has(dayId)) {
+        expandedDays.delete(dayId);
+      } else {
+        expandedDays.add(dayId);
+      }
+      renderWeekMenu();
+    }
+
+    function showRecipeDetail(id, e) {
+      e.stopPropagation();
+      currentRecipe = recipes.find(r => r.id === id);
+      if (!currentRecipe) return;
+
+      document.getElementById('modalRecipeName').textContent = currentRecipe.name;
+      document.getElementById('modalRecipeType').textContent = getTypeName(currentRecipe.type);
+      document.getElementById('statTime').textContent = currentRecipe.time;
+      document.getElementById('statDifficulty').textContent = currentRecipe.difficulty;
+      document.getElementById('statCalories').textContent = currentRecipe.calories;
+
+      document.getElementById('ingredientList').innerHTML = currentRecipe.ingredients.map((ing, i) => `
+        <li class="ingredient-item">
+          <span class="ingredient-num">${i + 1}</span>
+          <span style="flex: 1;">${ing}</span>
+        </li>
+      `).join('');
+
+      document.getElementById('stepList').innerHTML = currentRecipe.steps.map((step, i) => `
+        <li class="step-item">
+          <span class="step-num">${i + 1}</span>
+          <span class="step-text">${step}</span>
+        </li>
+      `).join('');
+
+      const blacklistBtn = document.getElementById('modalBlacklistBtn');
+      if (blacklistedIds.includes(id)) {
+        blacklistBtn.innerHTML = '✅ 取消拉黑';
+        blacklistBtn.className = 'btn btn-sm';
+        blacklistBtn.style.background = '#dcfce7';
+        blacklistBtn.style.color = '#16a34a';
+      } else {
+        blacklistBtn.innerHTML = '⚠️ 拉黑';
+        blacklistBtn.className = 'btn btn-sm btn-red';
+        blacklistBtn.style.background = '';
+      }
+
+      document.getElementById('recipeModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('recipeModal').style.display = 'none';
+      currentRecipe = null;
+    }
+
+    function blacklistFromModal() {
+      if (!currentRecipe) return;
+      if (blacklistedIds.includes(currentRecipe.id)) {
+        blacklistedIds = blacklistedIds.filter(id => id !== currentRecipe.id);
+      } else {
+        blacklistedIds.push(currentRecipe.id);
+      }
+      localStorage.setItem('blacklistedIds', JSON.stringify(blacklistedIds));
+      if (!blacklistedIds.includes(currentRecipe.id)) {
+        weekMenu = generateWeekMenu();
+        localStorage.setItem('weekMenu', JSON.stringify(weekMenu));
+      }
+      closeModal();
+      renderWeekMenu();
+      renderRecipeGrid();
+    }
+
+    function changeMeal(dayId, mealType, e) {
+      e.stopPropagation();
+      const filtered = recipes.filter(r => !blacklistedIds.includes(r.id) && 
+        (mealType === 'dinner' ? r.type === 'dinner' : r.type === 'breakfast' || r.type === 'lunch'));
+      
+      if (filtered.length === 0) {
+        alert('没有可选的菜谱了！');
+        return;
+      }
+
+      let selectedId = prompt(`请输入要更换的菜谱ID：\n\n${filtered.map(r => `${r.id}. ${r.name} (${getTypeName(r.type)})`).join('\n')}`);
+      selectedId = parseInt(selectedId);
+      const newRecipe = filtered.find(r => r.id === selectedId);
+      
+      if (newRecipe) {
+        weekMenu = weekMenu.map(day => {
+          if (day.id === dayId) {
+            return { ...day, [mealType]: newRecipe };
+          }
+          return day;
+        });
+        localStorage.setItem('weekMenu', JSON.stringify(weekMenu));
+        renderWeekMenu();
+      }
+    }
+
+    function regenerateMenu() {
+      weekMenu = generateWeekMenu();
+      localStorage.setItem('weekMenu', JSON.stringify(weekMenu));
+      renderWeekMenu();
+      renderShoppingList();
+    }
+
+    function renderShoppingList() {
+      const list = document.getElementById('shoppingList');
+      const items = {};
+      
+      weekMenu.forEach(day => {
+        ['breakfast', 'lunch', 'dinner'].forEach(meal => {
+          day[meal].ingredients.forEach(ing => {
+            const match = ing.match(/([\u4e00-\u9fa5]+)\s*([\d.]+)?\s*(.+)?/);
+            if (match) {
+              const [, name, qty, unit] = match;
+              const key = name.trim();
+              if (!items[key]) {
+                items[key] = { qty: 0, unit: unit || '个', purchased: false };
+              }
+              items[key].qty += parseFloat(qty) || 1;
+            }
+          });
+        });
+      });
+
+      const savedItems = JSON.parse(localStorage.getItem('shoppingItems') || '{}');
+      Object.keys(items).forEach(key => {
+        if (savedItems[key]) {
+          items[key].purchased = savedItems[key].purchased;
+          items[key].qty = savedItems[key].qty !== undefined ? savedItems[key].qty : items[key].qty;
+        }
+      });
+
+      let purchased = 0;
+      const total = Object.keys(items).length;
+
+      list.innerHTML = Object.entries(items).map(([name, item], i) => {
+        if (item.purchased) purchased++;
+        return `
+          <div class="shopping-item ${item.purchased ? 'purchased' : ''}" id="shop-item-${i}">
+            <div class="check-box ${item.purchased ? 'checked' : ''}" onclick="togglePurchased('${name}', ${i})">${item.purchased ? '✓' : ''}</div>
+            <span class="item-name">${name}</span>
+            <div class="item-qty">
+              <button class="qty-btn" onclick="adjustQty('${name}', -0.5)">-</button>
+              <span>${item.qty} ${item.unit}</span>
+              <button class="qty-btn" onclick="adjustQty('${name}', 0.5)">+</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('shoppingProgress').textContent = `${purchased}/${total} 已购`;
+    }
+
+    function togglePurchased(name, i) {
+      const item = document.getElementById(`shop-item-${i}`);
+      const check = item.querySelector('.check-box');
+      const isPurchased = check.classList.toggle('checked');
+      
+      const savedItems = JSON.parse(localStorage.getItem('shoppingItems') || '{}');
+      savedItems[name] = savedItems[name] || {};
+      savedItems[name].purchased = isPurchased;
+      localStorage.setItem('shoppingItems', JSON.stringify(savedItems));
+
+      item.classList.toggle('purchased');
+      check.innerHTML = isPurchased ? '✓' : '';
+
+      renderShoppingList();
+    }
+
+    function adjustQty(name, delta) {
+      const savedItems = JSON.parse(localStorage.getItem('shoppingItems') || '{}');
+      savedItems[name] = savedItems[name] || {};
+      const items = {};
+      
+      weekMenu.forEach(day => {
+        ['breakfast', 'lunch', 'dinner'].forEach(meal => {
+          day[meal].ingredients.forEach(ing => {
+            const match = ing.match(/([\u4e00-\u9fa5]+)\s*([\d.]+)?/);
+            if (match && match[1].trim() === name) {
+              if (!items[name]) items[name] = 0;
+              items[name] += parseFloat(match[2]) || 1;
+            }
+          });
+        });
+      });
+
+      const baseQty = items[name] || 1;
+      savedItems[name].qty = Math.max(0.5, (savedItems[name].qty || baseQty) + delta);
+      localStorage.setItem('shoppingItems', JSON.stringify(savedItems));
+      renderShoppingList();
+    }
+
+    function renderRecipeGrid() {
+      const grid = document.getElementById('recipeGrid');
+      const filtered = recipes.filter(r => {
+        if (blacklistedIds.includes(r.id)) return true;
+        return !currentSearch || r.name.toLowerCase().includes(currentSearch.toLowerCase());
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="text-center">
+            <div class="icon">👩🍳</div>
+            <p>没有找到匹配的菜谱</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(recipe => {
+        const tag = getTypeTag(recipe.type);
+        const isBlacklisted = blacklistedIds.includes(recipe.id);
+        const isSelected = selectedRecipes.has(recipe.id);
+        return `
+          <div class="recipe-card ${isBlacklisted ? 'blacklisted' : ''}">
+            <div class="recipe-header">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSelect(${recipe.id})" style="width: 18px; height: 18px; cursor: pointer;">
+                <div>
+                  <div class="recipe-name">${recipe.name}</div>
+                  <div class="recipe-tags">
+                    <span class="tag ${tag.class}">${tag.text}</span>
+                    <span style="font-size: 11px; color: #9ca3af;">${recipe.time}</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 5px;">
+                ${!isBlacklisted ? `
+                  <button class="btn btn-sm" style="background: #3b82f6; color: white;" onclick="editRecipe(${recipe.id}, event)">✏️ 编辑</button>
+                ` : ''}
+                <button class="btn btn-sm" style="${isBlacklisted ? 'background: #dcfce7; color: #16a34a;' : 'background: #fee2e2; color: #dc2626;'}" onclick="${isBlacklisted ? 'whitelistRecipe' : 'blacklistRecipe'}(${recipe.id}, event)">
+                  ${isBlacklisted ? '恢复' : '拉黑'}
+                </button>
+                <button class="btn btn-sm" style="background: #ef4444; color: white;" onclick="deleteRecipe(${recipe.id}, event)">🗑️ 删除</button>
+              </div>
+            </div>
+            ${!isBlacklisted ? `
+              <button style="width: 100%; text-align: left; padding: 10px 0; border-top: 1px solid #f3f4f6; color: #f97316; font-size: 13px; background: none; cursor: pointer;" onclick="showRecipeDetail(${recipe.id}, event)">
+                查看详情 →
+              </button>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function blacklistRecipe(id) {
+      if (!blacklistedIds.includes(id)) {
+        blacklistedIds.push(id);
+        localStorage.setItem('blacklistedIds', JSON.stringify(blacklistedIds));
+        weekMenu = generateWeekMenu();
+        localStorage.setItem('weekMenu', JSON.stringify(weekMenu));
+      }
+      renderRecipeGrid();
+      renderWeekMenu();
+    }
+
+    function whitelistRecipe(id) {
+      blacklistedIds = blacklistedIds.filter(i => i !== id);
+      localStorage.setItem('blacklistedIds', JSON.stringify(blacklistedIds));
+      renderRecipeGrid();
+    }
+
+    function filterRecipes() {
+      currentSearch = document.getElementById('recipeSearch').value.toLowerCase();
+      renderRecipeGrid();
+    }
+
+    function toggleSelect(id) {
+      if (selectedRecipes.has(id)) {
+        selectedRecipes.delete(id);
+      } else {
+        selectedRecipes.add(id);
+      }
+      updateDeleteButton();
+    }
+
+    function toggleSelectAll() {
+      const allNonBlacklisted = recipes.filter(r => !blacklistedIds.includes(r.id));
+      if (selectedRecipes.size === allNonBlacklisted.length) {
+        selectedRecipes.clear();
+      } else {
+        allNonBlacklisted.forEach(r => selectedRecipes.add(r.id));
+      }
+      updateDeleteButton();
+      renderRecipeGrid();
+    }
+
+    function updateDeleteButton() {
+      const btn = document.getElementById('deleteSelectedBtn');
+      btn.innerHTML = `🗑️ 批量删除 (${selectedRecipes.size})`;
+      if (selectedRecipes.size > 0) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+      } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+        btn.style.cursor = 'not-allowed';
+      }
+      document.getElementById('selectAllRecipes').checked = selectedRecipes.size > 0 && 
+        selectedRecipes.size === recipes.filter(r => !blacklistedIds.includes(r.id)).length;
+    }
+
+    function deleteRecipe(id, e) {
+      if (e) e.stopPropagation();
+      if (confirm(`确定要删除菜谱 "${recipes.find(r => r.id === id)?.name}" 吗？`)) {
+        recipes = recipes.filter(r => r.id !== id);
+        localStorage.setItem('recipes', JSON.stringify(recipes));
+        selectedRecipes.delete(id);
+        updateDeleteButton();
+        renderRecipeGrid();
+      }
+    }
+
+    function deleteSelectedRecipes() {
+      if (selectedRecipes.size === 0) return;
+      if (confirm(`确定要删除选中的 ${selectedRecipes.size} 个菜谱吗？`)) {
+        recipes = recipes.filter(r => !selectedRecipes.has(r.id));
+        localStorage.setItem('recipes', JSON.stringify(recipes));
+        selectedRecipes.clear();
+        updateDeleteButton();
+        renderRecipeGrid();
+      }
+    }
+
+    function editRecipe(id, e) {
+      if (e) e.stopPropagation();
+      editingRecipe = recipes.find(r => r.id === id);
+      if (!editingRecipe) return;
+
+      document.getElementById('newRecipeName').value = editingRecipe.name;
+      document.getElementById('newRecipeType').value = editingRecipe.type;
+      document.getElementById('newRecipeTime').value = editingRecipe.time;
+      document.getElementById('newRecipeDifficulty').value = editingRecipe.difficulty;
+      document.getElementById('newRecipeCalories').value = editingRecipe.calories;
+      
+      let ingHtml = '';
+      editingRecipe.ingredients.forEach((ing, i) => {
+        ingHtml += `
+          <div class="ing-input">
+            <input type="text" value="${ing}" id="ing${i}">
+            <button class="qty-btn" onclick="removeIngredient(${i})" style="background: #fee2e2; color: #dc2626;">×</button>
+          </div>
+        `;
+      });
+      document.getElementById('newIngredients').innerHTML = ingHtml;
+      ingredientCount = editingRecipe.ingredients.length;
+      
+      let stepHtml = '';
+      editingRecipe.steps.forEach((step, i) => {
+        stepHtml += `
+          <div class="ing-input">
+            <textarea rows="2" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; resize: none;" id="step${i}">${step}</textarea>
+            <button class="qty-btn" onclick="removeStep(${i})" style="background: #fee2e2; color: #dc2626; align-self: flex-start; margin-top: 0;">×</button>
+          </div>
+        `;
+      });
+      document.getElementById('newSteps').innerHTML = stepHtml;
+      stepCount = editingRecipe.steps.length;
+      
+      document.getElementById('addRecipeModal').style.display = 'flex';
+    }
+
+    function showImportModal() {
+      document.getElementById('importContent').value = '';
+      document.getElementById('importModal').style.display = 'flex';
+    }
+
+    function closeImportModal() {
+      document.getElementById('importModal').style.display = 'none';
+    }
+
+    function importRecipes() {
+      const content = document.getElementById('importContent').value.trim();
+      if (!content) {
+        alert('请粘贴要导入的菜谱数据！');
+        return;
+      }
+
+      try {
+        let imported = JSON.parse(content);
+        if (!Array.isArray(imported)) {
+          imported = [imported];
+        }
+
+        imported.forEach(r => {
+          if (r.name && r.type) {
+            r.id = Math.max(...recipes.map(r => r.id), 0) + 1;
+            r.time = r.time || '30分钟';
+            r.difficulty = r.difficulty || '简单';
+            r.calories = r.calories || 300;
+            r.ingredients = r.ingredients || [];
+            r.steps = r.steps || [];
+            recipes.push(r);
+          }
+        });
+
+        localStorage.setItem('recipes', JSON.stringify(recipes));
+        closeImportModal();
+        renderRecipeGrid();
+        alert(`成功导入 ${imported.length} 个菜谱！`);
+      } catch (e) {
+        alert('导入失败，请检查数据格式是否正确！\n\n示例格式：\n{"name":"菜名","type":"lunch","ingredients":["食材1","食材2"],"steps":["步骤1","步骤2"]}');
+      }
+    }
+
+    function showAddRecipeModal() {
+      document.getElementById('newRecipeName').value = '';
+      document.getElementById('newRecipeType').value = 'lunch';
+      document.getElementById('newRecipeTime').value = '';
+      document.getElementById('newRecipeDifficulty').value = '简单';
+      document.getElementById('newRecipeCalories').value = '';
+      
+      document.getElementById('newIngredients').innerHTML = `
+        <div class="ing-input">
+          <input type="text" placeholder="食材 1" id="ing0">
+          <button class="qty-btn" onclick="removeIngredient(0)" style="background: #fee2e2; color: #dc2626;">×</button>
+        </div>
+      `;
+      document.getElementById('newSteps').innerHTML = `
+        <div class="ing-input">
+          <textarea placeholder="步骤 1" rows="2" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; resize: none;" id="step0"></textarea>
+          <button class="qty-btn" onclick="removeStep(0)" style="background: #fee2e2; color: #dc2626; align-self: flex-start; margin-top: 0;">×</button>
+        </div>
+      `;
+      ingredientCount = 1;
+      stepCount = 1;
+      
+      document.getElementById('addRecipeModal').style.display = 'flex';
+    }
+
+    function closeAddRecipeModal() {
+      document.getElementById('addRecipeModal').style.display = 'none';
+    }
+
+    function addIngredient() {
+      const container = document.getElementById('newIngredients');
+      container.innerHTML += `
+        <div class="ing-input">
+          <input type="text" placeholder="食材 ${ingredientCount + 1}" id="ing${ingredientCount}">
+          <button class="qty-btn" onclick="removeIngredient(${ingredientCount})" style="background: #fee2e2; color: #dc2626;">×</button>
+        </div>
+      `;
+      ingredientCount++;
+    }
+
+    function removeIngredient(index) {
+      const container = document.getElementById('newIngredients');
+      const inputs = container.querySelectorAll('.ing-input');
+      if (inputs.length <= 1) return;
+      inputs[index].remove();
+      ingredientCount--;
+    }
+
+    function addStep() {
+      const container = document.getElementById('newSteps');
+      container.innerHTML += `
+        <div class="ing-input">
+          <textarea placeholder="步骤 ${stepCount + 1}" rows="2" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; resize: none;" id="step${stepCount}"></textarea>
+          <button class="qty-btn" onclick="removeStep(${stepCount})" style="background: #fee2e2; color: #dc2626; align-self: flex-start; margin-top: 0;">×</button>
+        </div>
+      `;
+      stepCount++;
+    }
+
+    function removeStep(index) {
+      const container = document.getElementById('newSteps');
+      const inputs = container.querySelectorAll('.ing-input');
+      if (inputs.length <= 1) return;
+      inputs[index].remove();
+      stepCount--;
+    }
+
+    function saveNewRecipe() {
+      const name = document.getElementById('newRecipeName').value.trim();
+      if (!name) {
+        alert('请输入菜谱名称！');
+        return;
+      }
+
+      const ingredients = [];
+      for (let i = 0; i < ingredientCount; i++) {
+        const val = document.getElementById(`ing${i}`)?.value.trim();
+        if (val) ingredients.push(val);
+      }
+      if (ingredients.length === 0) {
+        alert('请至少添加一种食材！');
+        return;
+      }
+
+      const steps = [];
+      for (let i = 0; i < stepCount; i++) {
+        const val = document.getElementById(`step${i}`)?.value.trim();
+        if (val) steps.push(val);
+      }
+      if (steps.length === 0) {
+        alert('请至少添加一个步骤！');
+        return;
+      }
+
+      if (editingRecipe) {
+        const index = recipes.findIndex(r => r.id === editingRecipe.id);
+        if (index !== -1) {
+          recipes[index] = {
+            ...recipes[index],
+            name,
+            type: document.getElementById('newRecipeType').value,
+            ingredients,
+            steps,
+            time: document.getElementById('newRecipeTime').value || '30分钟',
+            difficulty: document.getElementById('newRecipeDifficulty').value,
+            calories: parseInt(document.getElementById('newRecipeCalories').value) || 300
+          };
+        }
+        editingRecipe = null;
+      } else {
+        const newRecipe = {
+          id: Math.max(...recipes.map(r => r.id), 0) + 1,
+          name,
+          type: document.getElementById('newRecipeType').value,
+          ingredients,
+          steps,
+          time: document.getElementById('newRecipeTime').value || '30分钟',
+          difficulty: document.getElementById('newRecipeDifficulty').value,
+          calories: parseInt(document.getElementById('newRecipeCalories').value) || 300
+        };
+        recipes.push(newRecipe);
+      }
+      localStorage.setItem('recipes', JSON.stringify(recipes));
+      closeAddRecipeModal();
+      renderRecipeGrid();
+    }
+
+    function showTab(tabId) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.querySelector(`.tab[onclick="showTab('${tabId}')"]`).classList.add('active');
+      document.getElementById(tabId).style.display = 'block';
+      
+      if (tabId === 'recipes') {
+        renderRecipeGrid();
+      } else if (tabId === 'shopping') {
+        renderShoppingList();
+      }
+    }
+
+    window.onload = () => {
+      if (weekMenu.length === 0) {
+        weekMenu = generateWeekMenu();
+        localStorage.setItem('weekMenu', JSON.stringify(weekMenu));
+      }
+      renderWeekMenu();
+    };
+
+    window.onclick = (e) => {
+      if (e.target === document.getElementById('recipeModal')) closeModal();
+      if (e.target === document.getElementById('addRecipeModal')) closeAddRecipeModal();
+    };
+  </script>
+</body>
+</html>
