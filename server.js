@@ -24,16 +24,6 @@ app.get('/', (req, res) => {
 });
 app.use(express.static('build'));
 
-let importQueue = [];
-let isProcessing = false;
-let importStatus = {
-  status: 'idle', // idle, processing, completed
-  total: 0,
-  processed: 0,
-  results: [],
-  error: null
-};
-
 const readData = () => {
   if (fs.existsSync(DATA_FILE)) {
     return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
@@ -48,60 +38,6 @@ const readData = () => {
 
 const writeData = (data) => {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-};
-
-const processQueue = async () => {
-  if (isProcessing || importQueue.length === 0) {
-    return;
-  }
-
-  isProcessing = true;
-  importStatus.status = 'processing';
-  
-  console.log(`开始处理队列，共 ${importQueue.length} 道菜`);
-
-  while (importQueue.length > 0) {
-    const dishName = importQueue.shift();
-    
-    try {
-      console.log(`正在生成: ${dishName}`);
-      const recipe = await generateRecipeWithAI(dishName);
-      
-      // 保存到数据库
-      const data = readData();
-      const maxId = data.recipes.length > 0 
-        ? Math.max(...data.recipes.map(r => r.id)) 
-        : 0;
-      
-      const newRecipe = {
-        ...recipe,
-        id: maxId + 1
-      };
-      
-      data.recipes.push(newRecipe);
-      writeData(data);
-      
-      importStatus.results.push({
-        name: dishName,
-        success: true,
-        data: newRecipe
-      });
-      
-    } catch (error) {
-      console.error(`生成失败: ${dishName}`, error);
-      importStatus.results.push({
-        name: dishName,
-        success: false,
-        error: error.message
-      });
-    }
-    
-    importStatus.processed = importStatus.total - importQueue.length;
-  }
-
-  isProcessing = false;
-  importStatus.status = 'completed';
-  console.log('批量导入完成！');
 };
 
 const generateRecipeWithAI = async (dishName) => {
@@ -209,7 +145,7 @@ app.post('/api/ai/generate', async (req, res) => {
   }
 });
 
-app.post('/api/import-start', async (req, res) => {
+app.post('/api/batch-import', async (req, res) => {
   try {
     const { dishNames } = req.body;
     if (!dishNames || !Array.isArray(dishNames)) {
@@ -222,32 +158,53 @@ app.post('/api/import-start', async (req, res) => {
       return res.status(400).json({ success: false, error: '没有有效的菜名' });
     }
 
-    // 重置状态
-    importQueue = [...validNames];
-    importStatus = {
-      status: 'idle',
-      total: validNames.length,
-      processed: 0,
-      results: [],
-      error: null
-    };
+    const results = [];
+    const data = readData();
+    let maxId = data.recipes.length > 0 
+      ? Math.max(...data.recipes.map(r => r.id)) 
+      : 0;
 
-    // 启动处理队列（后台进行）
-    processQueue();
+    for (const dishName of validNames) {
+      try {
+        console.log(`正在生成: ${dishName}`);
+        const recipe = await generateRecipeWithAI(dishName);
+        
+        maxId++;
+        const newRecipe = {
+          ...recipe,
+          id: maxId
+        };
+        
+        data.recipes.push(newRecipe);
+        
+        results.push({
+          name: dishName,
+          success: true,
+          data: newRecipe
+        });
+        
+      } catch (error) {
+        console.error(`生成失败: ${dishName}`, error);
+        results.push({
+          name: dishName,
+          success: false,
+          error: error.message
+        });
+      }
+    }
+
+    // 保存所有数据
+    writeData(data);
 
     res.json({ 
       success: true, 
-      message: `已添加 ${validNames.length} 道菜到处理队列`,
+      results,
       total: validNames.length
     });
   } catch (error) {
-    console.error('启动导入失败:', error);
+    console.error('批量导入失败:', error);
     res.status(500).json({ success: false, error: error.message });
   }
-});
-
-app.get('/api/import-status', (req, res) => {
-  res.json(importStatus);
 });
 
 app.get('*', (req, res) => {

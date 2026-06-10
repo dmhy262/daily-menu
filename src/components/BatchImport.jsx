@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Plus, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 function BatchImport({ onClose, onImportSuccess, refreshRecipes }) {
@@ -6,25 +6,6 @@ function BatchImport({ onClose, onImportSuccess, refreshRecipes }) {
   const [phase, setPhase] = useState('input'); // input, processing, completed
   const [importStatus, setImportStatus] = useState(null);
   const [error, setError] = useState(null);
-  let pollingTimer = null;
-
-  const fetchImportStatus = async () => {
-    try {
-      const res = await fetch('/api/import-status');
-      const status = await res.json();
-      setImportStatus(status);
-      
-      if (status.status === 'completed') {
-        setPhase('completed');
-        if (refreshRecipes) {
-          refreshRecipes();
-        }
-        if (pollingTimer) clearInterval(pollingTimer);
-      }
-    } catch (err) {
-      console.error('获取状态失败:', err);
-    }
-  };
 
   const startImport = async () => {
     if (!dishNames.trim()) return;
@@ -34,7 +15,17 @@ function BatchImport({ onClose, onImportSuccess, refreshRecipes }) {
 
     try {
       setError(null);
-      const res = await fetch('/api/import-start', {
+      setPhase('processing');
+      
+      // 初始状态
+      setImportStatus({
+        status: 'processing',
+        total: names.length,
+        processed: 0,
+        results: []
+      });
+
+      const res = await fetch('/api/batch-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dishNames: names })
@@ -43,23 +34,25 @@ function BatchImport({ onClose, onImportSuccess, refreshRecipes }) {
       const result = await res.json();
 
       if (result.success) {
-        setPhase('processing');
-        // 开始轮询状态
-        await fetchImportStatus();
-        pollingTimer = setInterval(fetchImportStatus, 1500);
+        setImportStatus({
+          status: 'completed',
+          total: result.total,
+          processed: result.total,
+          results: result.results
+        });
+        setPhase('completed');
+        if (refreshRecipes) {
+          refreshRecipes();
+        }
       } else {
-        setError(result.error || '启动导入失败');
+        setError(result.error || '导入失败');
+        setPhase('input');
       }
     } catch (err) {
       setError(err.message || '请求失败');
+      setPhase('input');
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (pollingTimer) clearInterval(pollingTimer);
-    };
-  }, []);
 
   const successCount = importStatus?.results?.filter(r => r.success).length || 0;
   const failCount = importStatus?.results?.filter(r => !r.success).length || 0;
