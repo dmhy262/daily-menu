@@ -1,4 +1,4 @@
-import { Clock, ChefHat, AlertCircle, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Clock, ChefHat, Flame, AlertCircle, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 function RecipeList({ recipes, blacklistedIds, onRecipeClick, blacklist, whitelist, onDelete }) {
@@ -45,6 +45,9 @@ function RecipeList({ recipes, blacklistedIds, onRecipeClick, blacklist, whiteli
             </span>
             <span className="text-xs text-gray-400 flex items-center gap-1">
               <Clock size={12} /> {recipe.time}
+            </span>
+            <span className="text-xs text-gray-400 flex items-center gap-1">
+              <Flame size={12} /> {recipe.calories} kcal
             </span>
             <span className="text-xs text-gray-400 flex items-center gap-1">
               <ChefHat size={12} /> {recipe.difficulty}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>每日菜谱 v1.0</title>
+  <title>每日菜谱 v1.1</title>
   <style>
     /* ==================== 全局样式 ==================== */
     * {
@@ -924,7 +924,7 @@
         <span class="header-icon">🍳</span>
         每日菜谱
       </div>
-      <div class="header-version">v1.0</div>
+      <div class="header-version">v1.1</div>
     </header>
 
     <!-- 导航 -->
@@ -937,21 +937,11 @@
     <!-- ================ 页面1: 周菜谱 ================ -->
     <div class="page active" id="page-week">
       <!-- 配置栏 -->
-      <div class="config-panel">
-        <div class="config-item">
-          <span class="config-label">成人</span>
-          <div class="config-value">
-            <button class="config-btn" id="adult-minus">-</button>
-            <span class="config-num" id="adult-num">2</span>
-            <button class="config-btn" id="adult-plus">+</button>
-          </div>
-        </div>
-        <div class="config-item">
-          <span class="config-label">儿童</span>
-          <div class="config-value">
-            <button class="config-btn" id="child-minus">-</button>
-            <span class="config-num" id="child-num">0</span>
-            <button class="config-btn" id="child-plus">+</button>
+      <div class="config-panel" style="flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span style="font-size:14px; font-weight:600; color:var(--text-primary); white-space:nowrap;">每日菜品：</span>
+          <div id="daily-rules-container" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <!-- 动态渲染 -->
           </div>
         </div>
         <button class="refresh-btn" id="refresh-menu">🔄 重新生成菜谱</button>
@@ -1017,6 +1007,10 @@
           <div class="form-group">
             <label class="form-label">烹饪时间</label>
             <input type="text" class="form-input" id="recipe-time" placeholder="例如：30分钟">
+          </div>
+          <div class="form-group">
+            <label class="form-label">热量 (kcal)</label>
+            <input type="number" class="form-input" id="recipe-calories" placeholder="例如：350">
           </div>
           <div class="form-group">
             <label class="form-label">难度</label>
@@ -1107,7 +1101,7 @@
     let state = {
       recipes: [],
       blacklistedIds: [],
-      config: { adults: 2, children: 0 },
+      config: { dailyRules: { '荤菜': 1, '小荤': 1, '蔬菜': 1, '汤': 1 } },
       weekMenu: [],
       selectedDay: null,
       purchasedItems: {}
@@ -1129,10 +1123,13 @@
         const data = await res.json();
         state.recipes = data.recipes || [];
         state.blacklistedIds = data.blacklistedIds || [];
-        state.config = data.config || { adults: 2, children: 0 };
+        state.config = data.config || { dailyRules: { '荤菜': 1, '小荤': 1, '蔬菜': 1, '汤': 1 } };
+        if (!state.config.dailyRules || Array.isArray(state.config.dailyRules) || Object.keys(state.config.dailyRules).length === 0) {
+          state.config.dailyRules = { '荤菜': 1, '小荤': 1, '蔬菜': 1, '汤': 1 };
+        }
         state.weekMenu = data.weekMenu || [];
         
-        updateConfigDisplay();
+        renderDailyRules();
         
         if (state.weekMenu.length === 0 && state.recipes.length > 0) {
           regenerateWeekMenu();
@@ -1178,28 +1175,6 @@
         });
       });
       
-      // 配置
-      document.getElementById('adult-plus').addEventListener('click', () => {
-        state.config.adults = Math.min(10, state.config.adults + 1);
-        updateConfigDisplay();
-        saveData();
-      });
-      document.getElementById('adult-minus').addEventListener('click', () => {
-        state.config.adults = Math.max(1, state.config.adults - 1);
-        updateConfigDisplay();
-        saveData();
-      });
-      document.getElementById('child-plus').addEventListener('click', () => {
-        state.config.children = Math.min(10, state.config.children + 1);
-        updateConfigDisplay();
-        saveData();
-      });
-      document.getElementById('child-minus').addEventListener('click', () => {
-        state.config.children = Math.max(0, state.config.children - 1);
-        updateConfigDisplay();
-        saveData();
-      });
-      
       // 重新生成
       document.getElementById('refresh-menu').addEventListener('click', regenerateWeekMenu);
       
@@ -1234,25 +1209,46 @@
       document.getElementById('ai-generate-btn').addEventListener('click', generateRecipeWithAI);
     }
     
-    function updateConfigDisplay() {
-      document.getElementById('adult-num').textContent = state.config.adults;
-      document.getElementById('child-num').textContent = state.config.children;
+    function renderDailyRules() {
+      const container = document.getElementById('daily-rules-container');
+      const rules = state.config.dailyRules;
+      const typeColors = {
+        '荤菜': '#C75454', '大荤': '#C75454', '小荤': '#C7893C',
+        '蔬菜': '#5C9B5B', '汤': '#5B8BA6', '凉菜': '#8B7EC8',
+        '主食': '#D4A853', '甜品': '#E88BA3', '水果': '#6DBF6D'
+      };
+      
+      container.innerHTML = Object.entries(rules).map(([type, count]) => {
+        const bgColor = typeColors[type] || '#888';
+        return `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:16px; font-size:13px; font-weight:500; background:${bgColor}22; color:${bgColor}; border:1px solid ${bgColor}44; white-space:nowrap;">
+          ${type}
+          <button onclick="changeRuleCount('${type}', -1)" style="background:none; border:none; cursor:pointer; font-size:16px; color:inherit; padding:0 2px; line-height:1; opacity:0.7;">−</button>
+          <span style="min-width:16px; text-align:center; font-weight:700;">${count}</span>
+          <button onclick="changeRuleCount('${type}', 1)" style="background:none; border:none; cursor:pointer; font-size:16px; color:inherit; padding:0 2px; line-height:1; opacity:0.7;">+</button>
+        </span>`;
+      }).join('');
+    }
+
+    function changeRuleCount(type, delta) {
+      const rules = state.config.dailyRules;
+      rules[type] = Math.max(0, (rules[type] || 0) + delta);
+      saveData();
+      renderDailyRules();
     }
     
     // ==================== 生成周菜单 ====================
-    const categories = ['荤菜', '小荤', '蔬菜', '汤'];
     const weekNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     
     function regenerateWeekMenu() {
       const availableRecipes = state.recipes.filter(r => !state.blacklistedIds.includes(r.id));
+      const rules = state.config.dailyRules;
+      const categories = Object.keys(rules);
       
-      // 分类
       const recipesByType = {};
       categories.forEach(cat => {
         recipesByType[cat] = availableRecipes.filter(r => r.type === cat);
       });
       
-      // 每次都重置
       const usedRecipeIdsByType = {};
       categories.forEach(cat => {
         usedRecipeIdsByType[cat] = [];
@@ -1272,7 +1268,6 @@
           return selected;
         }
         
-        // 重置
         usedRecipeIdsByType[type] = [];
         const all = list.filter(r => r && r.id).sort(() => Math.random() - 0.5);
         if (all.length > 0) {
@@ -1292,17 +1287,13 @@
           dinner: []
         };
         
-        const meat = getRandomRecipe(recipesByType['荤菜'], '荤菜');
-        if (meat) dayMenu.dinner.push({ recipe: meat, portion: '荤菜' });
-        
-        const small = getRandomRecipe(recipesByType['小荤'], '小荤');
-        if (small) dayMenu.dinner.push({ recipe: small, portion: '小荤' });
-        
-        const veg = getRandomRecipe(recipesByType['蔬菜'], '蔬菜');
-        if (veg) dayMenu.dinner.push({ recipe: veg, portion: '蔬菜' });
-        
-        const soup = getRandomRecipe(recipesByType['汤'], '汤');
-        if (soup) dayMenu.dinner.push({ recipe: soup, portion: '汤' });
+        categories.forEach(cat => {
+          const count = rules[cat] != null ? rules[cat] : 1;
+          for (let j = 0; j < count; j++) {
+            const recipe = getRandomRecipe(recipesByType[cat], cat);
+            if (recipe) dayMenu.dinner.push({ recipe: recipe, portion: cat });
+          }
+        });
         
         result.push(dayMenu);
       }
@@ -1491,14 +1482,13 @@
             </div>
             <div class="recipe-details">
               <div class="recipe-detail-line">⏱️ ${r.time || '30分钟'}</div>
+              <div class="recipe-detail-line">🔥 ${r.calories || 0} kcal</div>
               <div class="recipe-detail-line">📊 ${r.difficulty || '简单'}</div>
               ${isBlacklisted ? '<div class="recipe-detail-line" style="color:var(--accent-red);">🚫 已拉黑</div>' : ''}
             </div>
             <div class="recipe-card-actions">
               <button class="recipe-card-btn view-recipe" onclick="viewRecipeDetail(${r.id})">查看详情</button>
-              <button class="recipe-card-btn blacklist-recipe" onclick="${isBlacklisted ? `unblacklistRecipe(${r.id})` : `blacklistRecipe(${r.id})`}">
-                ${isBlacklisted ? '取消拉黑' : '拉黑'}
-              </button>
+              <button class="recipe-card-btn view-recipe" onclick="editRecipe(${r.id})" style="background:var(--soft-blue-dark); color:var(--text-primary);">✏️ 编辑</button>
               <button class="recipe-card-btn blacklist-recipe" onclick="deleteRecipe(${r.id})" style="background:transparent; border:1px solid var(--warm-beige-dark);">删除</button>
             </div>
           </div>
@@ -1514,8 +1504,23 @@
       document.getElementById('recipe-name').value = '';
       document.getElementById('recipe-time').value = '';
       document.getElementById('recipe-difficulty').value = '';
+      document.getElementById('recipe-calories').value = '';
       document.getElementById('recipe-ingredients').value = '';
       document.getElementById('recipe-steps').value = '';
+      document.getElementById('modal-add').classList.add('active');
+    }
+
+    function editRecipe(id) {
+      const recipe = state.recipes.find(r => r.id === id);
+      if (!recipe) return;
+      
+      editingId = id;
+      document.getElementById('recipe-name').value = recipe.name || '';
+      document.getElementById('recipe-time').value = recipe.time || '';
+      document.getElementById('recipe-difficulty').value = recipe.difficulty || '';
+      document.getElementById('recipe-calories').value = recipe.calories || 0;
+      document.getElementById('recipe-ingredients').value = (recipe.ingredients || []).join('\n');
+      document.getElementById('recipe-steps').value = (recipe.steps || []).join('\n');
       document.getElementById('modal-add').classList.add('active');
     }
     
@@ -1529,20 +1534,104 @@
       const ingredients = ingredientsText ? ingredientsText.split('\n').map(l => l.trim()).filter(l => l) : ['主料 适量','辅料 适量'];
       const steps = stepsText ? stepsText.split('\n').map(l => l.trim()).filter(l => l) : ['准备食材','按常规方法烹饪','调味出锅'];
       
-      const newRecipe = {
-        id: Date.now(),
+      const recipeData = {
         name,
         type: getDishCategory(name),
         time: document.getElementById('recipe-time').value || '30分钟',
         difficulty: document.getElementById('recipe-difficulty').value || '简单',
+        calories: parseInt(document.getElementById('recipe-calories').value) || 0,
         ingredients,
         steps
       };
+
+      if (editingId) {
+        const idx = state.recipes.findIndex(r => r.id === editingId);
+        if (idx !== -1) {
+          state.recipes[idx] = { ...state.recipes[idx], ...recipeData };
+        }
+        editingId = null;
+      } else {
+        const newRecipe = {
+          id: Date.now(),
+          ...recipeData
+        };
+        state.recipes.push(newRecipe);
+        
+        generateImageForRecipe(newRecipe);
+      }
       
-      state.recipes.push(newRecipe);
       await saveData();
       document.getElementById('modal-add').classList.remove('active');
       renderRecipeList();
+    }
+
+    async function generateImageForRecipe(recipe) {
+      try {
+        await fetch(API_BASE + '/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dishName: recipe.name })
+        });
+        pollForImage(recipe.id, 20);
+      } catch (e) {
+        console.error('图片生成请求失败:', e);
+      }
+    }
+
+    async function generateImageForExisting(id) {
+      const recipe = state.recipes.find(r => r.id === id);
+      if (!recipe) return;
+      
+      const btn = document.getElementById('gen-img-btn-' + id);
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = '⏳ 生成中...';
+      }
+      
+      try {
+        await fetch(API_BASE + '/api/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dishName: recipe.name })
+        });
+        pollForImage(id, 20, () => viewRecipeDetail(id));
+      } catch (e) {
+        console.error('图片生成请求失败:', e);
+        alert('图片生成请求失败: ' + e.message);
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '✨ 生成菜品图片';
+        }
+      }
+    }
+
+    async function pollForImage(recipeId, maxRetries, onSuccess) {
+      let retries = 0;
+      const poll = async () => {
+        try {
+          const res = await fetch(API_BASE + '/api/data');
+          const data = await res.json();
+          const recipe = data.recipes.find(r => r.id === recipeId);
+          if (recipe && recipe.imageUrl) {
+            const local = state.recipes.find(r => r.id === recipeId);
+            if (local) local.imageUrl = recipe.imageUrl;
+            if (onSuccess) onSuccess();
+            return;
+          }
+        } catch (e) {}
+        
+        retries++;
+        if (retries < maxRetries) {
+          setTimeout(poll, 3000);
+        } else {
+          const btn = document.getElementById('gen-img-btn-' + recipeId);
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = '✨ 生成菜品图片';
+          }
+        }
+      };
+      setTimeout(poll, 8000);
     }
     
     function getDishCategory(name) {
@@ -1573,6 +1662,7 @@
         if (data && data.recipe) {
           document.getElementById('recipe-time').value = data.recipe.time || '30分钟';
           document.getElementById('recipe-difficulty').value = data.recipe.difficulty || '简单';
+          document.getElementById('recipe-calories').value = data.recipe.calories || 0;
           document.getElementById('recipe-ingredients').value = data.recipe.ingredients.join('\n');
           document.getElementById('recipe-steps').value = data.recipe.steps.join('\n');
         }
@@ -1632,14 +1722,18 @@
               type: getDishCategory(data.recipe.name),
               time: data.recipe.time || '30分钟',
               difficulty: data.recipe.difficulty || '简单',
+              calories: data.recipe.calories || 0,
               ingredients: data.recipe.ingredients,
               steps: data.recipe.steps
             };
             
             state.recipes.push(newRecipe);
+            await saveData();
             statusDiv.className += ' success';
             statusDiv.textContent = `${name} ✓`;
             success++;
+            
+            generateImageForRecipe(newRecipe);
           } else {
             throw new Error('失败');
           }
@@ -1654,7 +1748,6 @@
         document.getElementById('batch-progress-text').textContent = `${i + 1}/${lines.length} (成功 ${success}，失败 ${fail})`;
       }
       
-      await saveData();
       btn.disabled = false;
       renderRecipeList();
     }
@@ -1666,9 +1759,16 @@
       
       document.getElementById('view-recipe-name').textContent = recipe.name;
       document.getElementById('view-recipe-body').innerHTML = `
+        ${recipe.imageUrl ? `<div style="width:100%; border-radius:12px; overflow:hidden; margin-bottom:16px; background:#f3f4f6;">
+          <img src="${recipe.imageUrl}" alt="${recipe.name}" style="width:100%; max-height:280px; object-fit:contain; display:block;" onerror="this.parentElement.style.display='none'">
+        </div>` : `<div style="text-align:center; padding:20px; margin-bottom:16px; background:var(--warm-beige); border-radius:12px;">
+          <div style="font-size:48px; margin-bottom:8px;">🍽️</div>
+          <button class="ai-btn" onclick="generateImageForExisting(${recipe.id})" id="gen-img-btn-${recipe.id}">✨ 生成菜品图片</button>
+        </div>`}
         <div style="margin-bottom:10px;">
           <span style="padding:4px 12px; border-radius:8px; font-size:13px; margin-right:8px; background:var(--warm-beige);">${recipe.type}</span>
           <span style="font-size:14px; color:var(--text-secondary);">⏱️ ${recipe.time || '30分钟'}</span>
+          <span style="font-size:14px; color:var(--text-secondary); margin-left:8px;">🔥 ${recipe.calories || 0} kcal</span>
           <span style="font-size:14px; color:var(--text-secondary); margin-left:8px;">📊 ${recipe.difficulty || '简单'}</span>
         </div>
         

@@ -324,7 +324,7 @@ function App() {
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold">每周菜谱生成器</h1>
+              <h1 className="text-3xl font-bold">每周菜谱生成器 v1.1</h1>
               <p className="mt-1 text-orange-100">智能生成适合全家的每周菜谱</p>
             </div>
             <div className="flex gap-2">
@@ -568,7 +568,7 @@ function App() {
                     + 添加步骤
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">烹饪时间</label>
                     <input
@@ -577,6 +577,17 @@ function App() {
                       onChange={(e) => updateNewRecipeField('time', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       placeholder="如：30分钟"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">热量 (kcal)</label>
+                    <input
+                      type="number"
+                      value={newRecipe.calories}
+                      onChange={(e) => updateNewRecipeField('calories', parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      placeholder="如：300"
+                      min="0"
                     />
                   </div>
                   <div>

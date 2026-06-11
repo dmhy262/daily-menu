@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { exec } = require('child_process');
 const dotenv = require('dotenv');
 
 dotenv.config();
@@ -11,6 +12,8 @@ const PORT = process.env.PORT || 3001;
 const API_KEY = process.env.VOLC_API_KEY;
 const BASE_URL = process.env.VOLC_BASE_URL || 'https://ark.cn-beijing.volces.com/api/v3';
 const MODEL = process.env.VOLC_MODEL;
+const IMAGE_API_KEY = 'a6dcd83e-ea45-4413-8a47-35e2d03eb56a';
+const IMAGE_MODEL = 'doubao-seedream-5-0-260128';
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
@@ -145,6 +148,33 @@ app.post('/api/ai/generate', async (req, res) => {
   }
 });
 
+
+
+app.post('/api/generate-image', (req, res) => {
+  const { dishName } = req.body;
+  if (!dishName) {
+    return res.status(400).json({ success: false, error: '请提供菜品名称' });
+  }
+
+  res.json({ success: true, status: 'processing', message: '图片生成中...' });
+
+  const scriptPath = path.join(__dirname, 'generate-image.js');
+  const cmd = `node "${scriptPath}" "${dishName.replace(/"/g, '\\"')}" "${DATA_FILE.replace(/\\/g, '\\\\')}"`;
+  
+  exec(cmd, (error, stdout, stderr) => {
+    if (error) {
+      console.error('图片生成子进程错误:', error.message);
+      return;
+    }
+    if (stderr) {
+      console.error('图片生成stderr:', stderr);
+    }
+    if (stdout) {
+      console.log('图片生成结果:', stdout.trim());
+    }
+  });
+});
+
 app.post('/api/batch-import', async (req, res) => {
   try {
     const { dishNames } = req.body;
@@ -214,4 +244,12 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`服务器运行在 http://localhost:${PORT}`);
   console.log(`数据保存在 ${DATA_FILE}`);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('未捕获异常:', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('未处理的Promise拒绝:', reason);
 });
