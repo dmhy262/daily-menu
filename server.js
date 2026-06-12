@@ -16,6 +16,12 @@ const IMAGE_API_KEY = 'a6dcd83e-ea45-4413-8a47-35e2d03eb56a';
 const IMAGE_MODEL = 'doubao-seedream-5-0-260128';
 
 const DATA_FILE = path.join(__dirname, 'data.json');
+const IMAGE_DIR = path.join(__dirname, 'public', 'images');
+
+if (!fs.existsSync(IMAGE_DIR)) {
+  fs.mkdirSync(IMAGE_DIR, { recursive: true });
+  console.log('已创建图片目录:', IMAGE_DIR);
+}
 
 app.use(cors());
 app.use(express.json());
@@ -106,12 +112,13 @@ app.get('/api/data', (req, res) => {
 });
 
 app.post('/api/data', (req, res) => {
-  const { recipes, blacklistedIds, config, weekMenu } = req.body;
+  const { recipes, blacklistedIds, config, weekMenu, fridgeItems } = req.body;
   const data = {
     recipes,
     blacklistedIds,
     config,
     weekMenu,
+    fridgeItems,
     updatedAt: new Date().toISOString()
   };
   writeData(data);
